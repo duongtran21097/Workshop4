@@ -49,12 +49,28 @@ def make_client(base_url, api_key):
 
 
 def get_rag_chain(base_url, api_key, role):
-    """Return cached Langchain chain, rebuilding if role changed or not yet built."""
+    """Return cached chain, rebuilding only if role changed. History is preserved."""
     if st.session_state.rag_chain is None or st.session_state._chain_role != role:
         st.session_state.rag_chain = build_rag_chain(base_url, api_key, role)
         st.session_state._chain_role = role
-        st.session_state.chat_history = []
+        # KHÔNG xóa chat_history nữa — history thuộc về session, không phải chain
     return st.session_state.rag_chain
+
+
+def format_history_for_chain(chat_history):
+    """
+    Convert UI history [{role, content}, ...] to LangChain format [(human, ai), ...].
+    LangChain's ConversationalRetrievalChain expects tuples of (human_msg, ai_msg).
+    """
+    pairs = []
+    pending_user = None
+    for msg in chat_history:
+        if msg["role"] == "user":
+            pending_user = msg["content"]
+        elif msg["role"] == "assistant" and pending_user is not None:
+            pairs.append((pending_user, msg["content"]))
+            pending_user = None
+    return pairs
 
 
 # ------------------------------------------------------------------ #
@@ -285,8 +301,15 @@ def render_outputs(client, base_url, api_key):
                 with st.chat_message("assistant"):
                     try:
                         chain = get_rag_chain(base_url, api_key, role)
+                        # Lấy history TRƯỚC khi append prompt mới (history = các turn đã hoàn thành)
+                        history_pairs = format_history_for_chain(
+                            st.session_state.chat_history[:-1]  # bỏ message user vừa append
+                        )
                         with st.spinner("🤖 Thinking..."):
-                            result = chain.invoke({"question": prompt})
+                            result = chain.invoke({
+                                "question": prompt,
+                                "chat_history": history_pairs,
+                            })
                         reply = result["answer"]
                         st.markdown(reply)
                         st.session_state.chat_history.append({"role": "assistant", "content": reply})

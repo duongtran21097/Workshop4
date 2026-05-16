@@ -3,9 +3,8 @@ Langchain RAG chain for the Meeting AI Assistant chat tab.
 
 Architecture:
   VectorStoreRetriever — wraps vector_store query function
-                         into a Langchain-compatible BaseRetriever
-  build_rag_chain      — returns a ConversationalRetrievalChain backed by
-                         VectorStoreRetriever + ConversationBufferMemory
+  build_rag_chain      — returns a ConversationalRetrievalChain
+                         (memory is managed externally by the caller)
 """
 
 from langchain_core.retrievers import BaseRetriever
@@ -13,7 +12,6 @@ from langchain_core.documents import Document
 from langchain_core.callbacks.manager import CallbackManagerForRetrieverRun
 from langchain_openai import ChatOpenAI
 from langchain_classic.chains import ConversationalRetrievalChain
-from langchain_classic.memory import ConversationBufferMemory
 from langchain_core.prompts import PromptTemplate
 from pydantic import ConfigDict
 
@@ -27,8 +25,6 @@ ROLE_PROMPTS = {
 
 
 class VectorStoreRetriever(BaseRetriever):
-    """Bridges vector_store module to the Langchain retriever interface."""
-
     model_config = ConfigDict(arbitrary_types_allowed=True)
     n_results: int = 3
 
@@ -43,13 +39,8 @@ def build_rag_chain(
     base_url: str, api_key: str, role: str = "Manager"
 ) -> ConversationalRetrievalChain:
     """
-    Build a ConversationalRetrievalChain with role-aware prompting.
-
-    Components:
-      - ChatOpenAI (Azure) as the LLM
-      - VectorStoreRetriever pulling top-3 chunks from FAISS index
-      - ConversationBufferMemory for multi-turn memory
-      - PromptTemplate injecting the role instruction
+    Build a stateless ConversationalRetrievalChain.
+    Chat history is passed in via chain.invoke({"question": ..., "chat_history": [...]}).
     """
     llm = ChatOpenAI(
         base_url=base_url,
@@ -62,7 +53,8 @@ def build_rag_chain(
         template=(
             "You are a helpful meeting assistant. "
             f"{ROLE_PROMPTS.get(role, '')}\n\n"
-            "Use the retrieved meeting notes below to answer accurately.\n\n"
+            "Use the retrieved meeting notes below to answer accurately. "
+            "Answer in the same language as the question.\n\n"
             "Context:\n{context}\n\n"
             "Question: {question}\n"
             "Answer:"
@@ -70,16 +62,23 @@ def build_rag_chain(
         input_variables=["context", "question"],
     )
 
-    memory = ConversationBufferMemory(
-        memory_key="chat_history",
-        return_messages=True,
-        output_key="answer",
+    # Condense prompt that respects the original question's language
+    condense_prompt = PromptTemplate(
+        template=(
+            "Given the conversation history and a follow-up question, rephrase "
+            "the follow-up as a standalone question. Keep it in the SAME LANGUAGE "
+            "as the follow-up question.\n\n"
+            "Chat History:\n{chat_history}\n\n"
+            "Follow-up: {question}\n"
+            "Standalone question:"
+        ),
+        input_variables=["chat_history", "question"],
     )
 
     return ConversationalRetrievalChain.from_llm(
         llm=llm,
         retriever=VectorStoreRetriever(),
-        memory=memory,
+        condense_question_prompt=condense_prompt,
         combine_docs_chain_kwargs={"prompt": prompt},
         return_source_documents=False,
         verbose=False,
