@@ -123,7 +123,7 @@ pip install -r requirements.txt
 | `langchain-community` | Community integrations |
 | `langchain-classic` | ConversationalRetrievalChain, ConversationBufferMemory |
 | `faiss-cpu` | FAISS `IndexFlatIP` — in-memory vector index |
-| `sentence-transformers` | Local embedding model (`all-MiniLM-L6-v2`, ~80 MB) |
+| `sentence-transformers` | Local embedding model (`paraphrase-multilingual-MiniLM-L12-v2`, ~80 MB) |
 | `numpy` | Array operations |
 | `scikit-learn` | PCA and t-SNE dimensionality reduction |
 | `plotly` | Interactive 2D embedding visualization |
@@ -184,7 +184,7 @@ Enter your Azure OpenAI credentials in the sidebar:
 ### AI Chat (RAG)
 
 - Select a **lens** (Manager / Developer / QA) to focus responses on decisions, implementation, or quality.
-- Each question is embedded with `all-MiniLM-L6-v2` and searched against the FAISS index (cosine similarity).
+- Each question is embedded with `paraphrase-multilingual-MiniLM-L12-v2` and searched against the FAISS index (cosine similarity).
 - Top-3 chunks — with their `source` metadata — are injected as context into the prompt.
 - Conversation history is maintained via `ConversationBufferMemory`.
 - Switching lens resets the conversation and rebuilds the chain.
@@ -239,7 +239,7 @@ All vector storage is **in-memory** (FAISS) — no database setup or persistent 
 
 - **No persistent storage** — uploaded files and analysis results are held in Streamlit session state only; data is lost when the session ends or the app restarts.
 - **EasyOCR unavailable** — image OCR relies on pytesseract (Tesseract engine); quality may differ from local EasyOCR results.
-- **Cold start** — first load after inactivity takes ~30–60 seconds while the embedding model (`all-MiniLM-L6-v2`, ~80 MB) downloads.
+- **Cold start** — first load after inactivity takes ~30–60 seconds while the embedding model (`paraphrase-multilingual-MiniLM-L12-v2`, ~80 MB) downloads.
 
 > ChromaDB was replaced by FAISS because ChromaDB's `opentelemetry-*` dependency chain includes a protobuf C extension incompatible with Python 3.14 (Streamlit Cloud default). FAISS carries no such transitive dependencies.
 

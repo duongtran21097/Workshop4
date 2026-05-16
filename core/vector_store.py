@@ -1,6 +1,6 @@
 """
 In-memory vector store using FAISS + SentenceTransformers.
-Chunks meeting notes by paragraph, embeds with all-MiniLM-L6-v2,
+Chunks meeting notes by paragraph, embeds with paraphrase-multilingual-MiniLM-L12-v2,
 and indexes with FAISS IndexFlatIP (cosine similarity via L2 normalization).
 """
 import re
