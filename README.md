@@ -66,7 +66,7 @@ workshop-04/
 | LLM | Azure OpenAI GPT-4o |
 | RAG Chain | Langchain `ConversationalRetrievalChain` + `ConversationBufferMemory` |
 | Vector Store | FAISS `IndexFlatIP` — in-memory cosine similarity search |
-| Embeddings | SentenceTransformers `all-MiniLM-L6-v2` (local, no API key needed) |
+| Embeddings | SentenceTransformers `paraphrase-multilingual-MiniLM-L12-v2` (local, no API key needed) |
 | Chunk Metadata | `{"source": filename, "index": i, "chars": n}` per chunk |
 | OCR | pytesseract + pdfplumber (images & PDFs); EasyOCR optional local fallback |
 | TTS | Google Text-to-Speech (gTTS) |
