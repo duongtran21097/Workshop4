@@ -91,6 +91,72 @@ def render_intro():
 def render_processing_state(client):
     st.title("⚙️ Processing Meeting Notes")
     st.info(f"Analyzing: **{st.session_state.uploaded_name}**")
+    try:
+        res_summary = client.chat.completions.create(
+            model="GPT-4o",
+            messages=[
+                {"role": "system", "content": "Summarize strictly using: ### Overview, ### Key Results, ### Action Items"},
+                {"role": "user", "content": st.session_state.uploaded_content}
+            ],
+            temperature=0.5
+        )
+    except Exception as e:
+        err = str(e)
+        if "404" in err or "Not Found" in err:
+            st.error("❌ Endpoint not found. Please verify your Azure endpoint URL.")
+        elif "401" in err or "Unauthorized" in err:
+            st.error("🔑 Invalid API key. Please check your credentials.")
+        elif "timeout" in err.lower() or "timed out" in err.lower():
+            st.error("⏱️ Connection timed out. Please try again.")
+        elif any(k in err for k in ["Connection", "Failed to establish", "Name or service not known", "APIConnectionError"]):
+            st.error("❌ Cannot reach endpoint. Please check your URL.")
+        else:
+            st.error(f"❌ Connection failed: `{e}`")
+        st.session_state.app_stage = "ready"
+        return
+
+    # ── Validate content is meeting-related ───────────────────
+    try:
+        with st.spinner("🔍 Verifying content type..."):
+            res_check = client.chat.completions.create(
+                model="GPT-4o",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a content classifier. "
+                            "Determine if the given text is a meeting note, meeting transcript, "
+                            "meeting summary, or any kind of meeting-related document. "
+                            "Reply ONLY with a JSON object in this exact format (no markdown, no explanation):\n"
+                            '{"is_meeting": true, "reason": "short reason in English"}'
+                        )
+                    },
+                    {"role": "user", "content": st.session_state.uploaded_content[:3000]}
+                ],
+                temperature=0
+            )
+
+        raw = res_check.choices[0].message.content.strip()
+        clean = raw.replace("```json", "").replace("```", "").strip()
+        check_result = json.loads(clean)
+
+        if not check_result.get("is_meeting", True):
+            st.error("❌ **Invalid Content — Not a Meeting Document**")
+            st.warning(
+                f"**Reason:** {check_result.get('reason', 'Unable to determine.')}\n\n"
+                "Please upload a file that contains meeting-related content such as:\n"
+                "- Meeting notes or minutes\n"
+                "- Meeting transcripts\n"
+                "- Standup or sprint meeting summaries\n"
+                "- Any structured meeting record"
+            )
+            st.session_state.app_stage = "ready"
+            if st.button("⬅️ Go Back"):
+                st.rerun()
+            return
+
+    except Exception as e:
+        st.warning(f"⚠️ Content type check could not be completed (skipping): {e}")
 
     try:
         with st.status("AI is thinking...", expanded=True) as status:
@@ -101,14 +167,7 @@ def render_processing_state(client):
             st.session_state.rag_chain = None  # force rebuild with fresh data
 
             status.write("📝 Generating executive summary...")
-            res_summary = client.chat.completions.create(
-                model="GPT-4o",
-                messages=[
-                    {"role": "system", "content": "Summarize strictly using: ### Overview, ### Key Results, ### Action Items"},
-                    {"role": "user", "content": st.session_state.uploaded_content}
-                ],
-                temperature=0.5
-            )
+
             summary = res_summary.choices[0].message.content
 
             status.write("🎫 Creating Jira tickets...")
@@ -420,8 +479,12 @@ with st.sidebar:
     st.divider()
 
     if st.button("🚀 Run Analysis", type="primary", use_container_width=True):
-        if not base_url or not api_key or not st.session_state.uploaded_content:
-            st.error("Missing config or file!")
+        if not base_url:
+            st.error("❌ Please enter your Azure Endpoint!")
+        elif not api_key:
+            st.error("❌ Please enter your API Key!")
+        elif not st.session_state.uploaded_content:
+            st.error("❌ Please upload a file or select a sample!")
         else:
             st.session_state.app_stage = "processing"
             st.rerun()

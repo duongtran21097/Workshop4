@@ -1,0 +1,14 @@
+def calculate_sum(a, b):
+    return a + b
+
+class DataProcessor:
+    def __init__(self):
+        self.data = []
+    
+    def process(self, input_data):
+        for item in input_data:
+            self.data.append(item * 2)
+        return self.data
+
+SELECT * FROM users WHERE id = 1;
+INSERT INTO orders VALUES (1, 'product', 100);
